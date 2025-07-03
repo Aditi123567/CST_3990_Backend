@@ -164,40 +164,31 @@ app.get('/collection/Products', async (req, res) => {
 });
 
 // Search products
-app.get('/collection/Products/search', async (req, res) => {
-  const { q } = req.query;
-  console.log(`🔍 Search request for: "${q}"`);
-  
-  if (!q || q.trim().length === 0) {
-    return res.status(400).json({ message: 'Search query is required' });
-  }
+app.get('/collection/:collectionName/search', async (req, res, next) => {
+        const query = req.query.q;
+        const collection = req.collection;
 
-  try {
-    const searchRegex = new RegExp(q, 'i');
-    
-    const products = await db.collection('Products').find({
-      $or: [
-        { title: searchRegex },
-        { author: searchRegex },
-        { genre: searchRegex },
-        { description: searchRegex }
-      ]
-    }).toArray();
-    
-    console.log(`✅ Found ${products.length} products matching "${q}"`);
-    
-    // Add CORS headers explicitly
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    res.json(products);
-  } catch (err) {
-    console.error('❌ Search error:', err);
-    res.status(500).json({ message: 'Search failed', error: err.message });
-  }
-});
+        if (!query) {
+            return res.status(400).json({ error: 'Query parameter "q" is required.' });
+                }
 
+    try {
+        console.log("Search query received:", query);
+        console.log("Collection name:", req.params.collectionName);
+
+        const results = await collection.find({
+            $or: [
+                { title: { $regex: query, $options: 'i' } },
+                { description: { $regex: query, $options: 'i' } }
+            ]
+        }).toArray();
+
+        res.json(results);
+                } catch (err) {
+            console.error("Search error:", err);
+            res.status(500).json({ error: 'Internal Server Error', details: err.message });
+            }
+        });
 // 👤 AUTHENTICATION ROUTES
 
 // Register route
