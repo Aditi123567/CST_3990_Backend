@@ -164,50 +164,31 @@ app.get('/collection/Products', async (req, res) => {
 });
 
 // Search products
-app.get('/collection/Products/search', ensureDBConnection, async (req, res) => {
-  const { q } = req.query;
-  console.log(`🔍 Search request for: "${q}"`);
-  console.log('🔍 Database status:', db ? 'Connected' : 'Disconnected');
-  
-  if (!q || q.trim().length === 0) {
-    return res.status(400).json({ 
-      error: 'Bad Request',
-      message: 'Search query is required',
-      details: 'Please provide a search query parameter "q"' 
-    });
-  }
+app.get('/collection/:collectionName/search', async (req, res, next) => {
+        const query = req.query.q;
+        const collection = req.collection;
 
-  try {
-    // Ensure database is connected
-    if (!db) {
-      throw new Error('Database connection not established');
-    }
+        if (!query) {
+            return res.status(400).json({ error: 'Query parameter "q" is required.' });
+                }
 
-    console.log('🔍 Creating search regex for:', q);
-    const searchRegex = new RegExp(q.trim(), 'i');
-    
-    console.log('🔍 Executing search query...');
-    const products = await db.collection('Products').find({
-      $or: [
-        { title: searchRegex },
-        { author: searchRegex },
-        { genre: searchRegex },
-        { description: searchRegex }
-      ]
-    }).toArray();
-    
-    console.log(`✅ Found ${products.length} products matching "${q}"`);
-    res.json(products);
-  } catch (err) {
-    console.error('❌ Search error:', err);
-    console.error('❌ Error stack:', err.stack);
-    res.status(500).json({ 
-      error: 'Internal Server Error', 
-      details: err.message,
-      message: 'Search failed'
-    });
-  }
-});
+    try {
+        console.log("Search query received:", query);
+        console.log("Collection name:", req.params.collectionName);
+
+        const results = await collection.find({
+            $or: [
+                { title: { $regex: query, $options: 'i' } },
+                { description: { $regex: query, $options: 'i' } }
+            ]
+        }).toArray();
+
+        res.json(results);
+                } catch (err) {
+            console.error("Search error:", err);
+            res.status(500).json({ error: 'Internal Server Error', details: err.message });
+            }
+        });
 // 👤 AUTHENTICATION ROUTES
 
 // Register route
