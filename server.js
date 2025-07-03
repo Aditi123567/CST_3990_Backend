@@ -10,16 +10,25 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'rapidread_secret_key';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://Orange123:Orange123@cluster0.hhguvm7.mongodb.net/Bookstore?retryWrites=true&w=majority';
 
-// ✅ CORS Configuration
+// ✅ CORS Configuration - THE MAIN FIX
 app.use(cors({
-  origin: ['http://localhost:5500', 'http://127.0.0.1:5500', 'http://localhost:3000'],
+  origin: [
+    'http://localhost:5500', 
+    'http://127.0.0.1:5500', 
+    'http://localhost:3000',
+    'https://aditi123567.github.io/CST_3990_Frontend/',
+    // Add more origins if needed
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
-app.use(express.static('public')); // For serving static files
+app.use(express.static('public'));
 
 // 📁 Serve static files (images)
 app.use('/images', express.static(path.join(__dirname, 'images')));
@@ -35,9 +44,6 @@ MongoClient.connect(MONGO_URI, {
   db = client.db('Bookstore');
   console.log('✅ Connected to MongoDB');
   
-  // Initialize sample data if needed
-  // initializeSampleData();
-
   app.listen(PORT, () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
   });
@@ -121,6 +127,70 @@ app.get('/', (req, res) => {
       chatbot: 'POST /chatbot/respond'
     }
   });
+});
+
+// 📚 PRODUCTS ROUTES - Enhanced with better logging
+
+// Get all products
+app.get('/collection/Products', async (req, res) => {
+  console.log('📚 Request received for all products');
+  console.log('📚 Request origin:', req.headers.origin);
+  console.log('📚 Request headers:', req.headers);
+  
+  try {
+    if (!db) {
+      console.error('❌ Database not connected');
+      return res.status(500).json({ message: 'Database not connected' });
+    }
+
+    const products = await db.collection('Products').find({}).toArray();
+    console.log(`✅ Found ${products.length} products in database`);
+    
+    // Add CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    res.json(products);
+  } catch (err) {
+    console.error('❌ Error fetching products:', err);
+    res.status(500).json({ message: 'Failed to fetch products', error: err.message });
+  }
+});
+
+// Search products
+app.get('/collection/Products/search', async (req, res) => {
+  const { q } = req.query;
+  console.log(`🔍 Search request for: "${q}"`);
+  
+  if (!q || q.trim().length === 0) {
+    return res.status(400).json({ message: 'Search query is required' });
+  }
+
+  try {
+    const searchRegex = new RegExp(q, 'i');
+    
+    const products = await db.collection('Products').find({
+      $or: [
+        { title: searchRegex },
+        { author: searchRegex },
+        { genre: searchRegex },
+        { description: searchRegex }
+      ]
+    }).toArray();
+    
+    console.log(`✅ Found ${products.length} products matching "${q}"`);
+    
+    // Add CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    res.json(products);
+  } catch (err) {
+    console.error('❌ Search error:', err);
+    res.status(500).json({ message: 'Search failed', error: err.message });
+  }
 });
 
 // 👤 AUTHENTICATION ROUTES
@@ -228,46 +298,6 @@ app.post('/auth/login', validateLogin, async (req, res) => {
   }
 });
 
-// 📚 PRODUCTS ROUTES
-
-// Get all products
-app.get('/collection/Products', async (req, res) => {
-  try {
-    const products = await db.collection('Products').find({}).toArray();
-    res.json(products);
-  } catch (err) {
-    console.error('Error fetching products:', err);
-    res.status(500).json({ message: 'Failed to fetch products', error: err.message });
-  }
-});
-
-// Search products
-app.get('/collection/Products/search', async (req, res) => {
-  const { q } = req.query;
-  
-  if (!q || q.trim().length === 0) {
-    return res.status(400).json({ message: 'Search query is required' });
-  }
-
-  try {
-    const searchRegex = new RegExp(q, 'i'); // Case-insensitive search
-    
-    const products = await db.collection('Products').find({
-      $or: [
-        { title: searchRegex },
-        { author: searchRegex },
-        { genre: searchRegex },
-        { description: searchRegex }
-      ]
-    }).toArray();
-    
-    res.json(products);
-  } catch (err) {
-    console.error('Search error:', err);
-    res.status(500).json({ message: 'Search failed', error: err.message });
-  }
-});
-
 // Get single product
 app.get('/collection/Products/:id', async (req, res) => {
   try {
@@ -293,7 +323,7 @@ app.get('/collection/Products/:id', async (req, res) => {
 
 // 🛒 CART & ORDER ROUTES (Protected)
 
-// Add to cart (if you want to store cart in database)
+// Add to cart
 app.post('/cart/add', verifyToken, async (req, res) => {
   const { productId, quantity = 1 } = req.body;
   const userId = req.user.id;
@@ -409,146 +439,6 @@ app.get('/admin/stats', verifyToken, async (req, res) => {
   }
 });
 
-// 🗃️ Initialize sample data
-// async function initializeSampleData() {
-//   try {
-//     // Check if products already exist
-//     const productCount = await db.collection('Products').countDocuments();
-    
-//     if (productCount === 0) {
-//       console.log('📚 Initializing sample product data...');
-      
-//       const sampleProducts = [
-//         {
-//           id: 201,
-//           title: "Harry Potter and the Order of the Phoenix",
-//           author: "J.K. Rowling",
-//           genre: "Fantasy",
-//           price: 57,
-//           image: "book1.jpeg",
-//           AvailableInventory: 7,
-//           description: "The fifth book in the Harry Potter series follows Harry's fifth year at Hogwarts School of Witchcraft and Wizardry."
-//         },
-//         {
-//           id: 202,
-//           title: "A Long Petal of the Sea",
-//           author: "Isabel Allende",
-//           genre: "Historical",
-//           price: 66,
-//           image: "book2.jpg",
-//           AvailableInventory: 6,
-//           description: "A sweeping novel that tells the story of Victor Dalmau, a young doctor, and Roser, a pregnant young woman, who flee the Spanish Civil War for Chile."
-//         },
-//         {
-//           id: 203,
-//           title: "Dear Edward: A Read with Jenna Pick",
-//           author: "Ann Napolitano",
-//           genre: "Fiction",
-//           price: 51,
-//           image: "book3.jpg",
-//           AvailableInventory: 8,
-//           description: "A transcendent coming-of-age story about the sole survivor of a plane crash."
-//         },
-//         {
-//           id: 204,
-//           title: "To Kill a Mockingbird",
-//           author: "Harper Lee",
-//           genre: "Fiction",
-//           price: 55,
-//           image: "book4.jpg",
-//           AvailableInventory: 5,
-//           description: "Harper Lee's timeless classic explores themes of racial injustice and moral growth through the eyes of Scout Finch in 1930s Alabama."
-//         },
-//         {
-//           id: 205,
-//           title: "Atomic Habits",
-//           author: "James Clear",
-//           genre: "Self help",
-//           price: 66,
-//           image: "book5.jpg",
-//           AvailableInventory: 10,
-//           description: "James Clear presents a comprehensive guide to building good habits and breaking bad ones."
-//         },
-//         {
-//           id: 206,
-//           title: "The Alchemist",
-//           author: "Paulo Coelho",
-//           genre: "Philosophical",
-//           price: 53,
-//           image: "book6.jpg",
-//           AvailableInventory: 10,
-//           description: "Paulo Coelho's philosophical novel follows Santiago, a young shepherd, on his journey to find treasure."
-//         },
-//         {
-//           id: 207,
-//           title: "Famous Five: Five Go Off to Camp",
-//           author: "Enid Blyton",
-//           genre: "Adventure",
-//           price: 34,
-//           image: "book7.jpg",
-//           AvailableInventory: 8,
-//           description: "Join the Famous Five on another exciting adventure as they go camping and discover mysterious happenings."
-//         },
-//         {
-//           id: 208,
-//           title: "Little Women",
-//           author: "Louisa May Alcott",
-//           genre: "Classic",
-//           price: 65,
-//           image: "book8.jpg",
-//           AvailableInventory: 9,
-//           description: "Louisa May Alcott's beloved novel follows the lives of the four March sisters as they grow from childhood to womanhood."
-//         },
-//         {
-//           id: 209,
-//           title: "Middlemarch",
-//           author: "George Eliot",
-//           genre: "Commentary",
-//           price: 95,
-//           image: "book9.jpg",
-//           AvailableInventory: 6,
-//           description: "George Eliot's masterpiece is set in the fictional town of Middlemarch and follows the lives of several characters."
-//         },
-//         {
-//           id: 210,
-//           title: "Mrs Dalloway",
-//           author: "Virginia Woolf",
-//           genre: "Literature",
-//           price: 55,
-//           image: "book10.jpg",
-//           AvailableInventory: 9,
-//           description: "Virginia Woolf's modernist novel follows Clarissa Dalloway through a single day in post-World War I London."
-//         },
-//         {
-//           id: 211,
-//           title: "Continental Drift",
-//           author: "Russell Banks",
-//           genre: "Political",
-//           price: 56,
-//           image: "book11.jpg",
-//           AvailableInventory: 8,
-//           description: "Russell Banks' powerful novel tells the parallel stories of a New Hampshire oil burner repairman and a Haitian refugee."
-//         },
-//         {
-//           id: 212,
-//           title: "The Little Prince",
-//           author: "Antoine de Saint-Exupéry",
-//           genre: "Adventure",
-//           price: 62,
-//           image: "book12.jpg",
-//           AvailableInventory: 10,
-//           description: "Antoine de Saint-Exupéry's beloved tale of a pilot who meets a young prince from another planet."
-//         }
-//       ];
-      
-//       await db.collection('Products').insertMany(sampleProducts);
-//       console.log('✅ Sample product data initialized');
-//     }
-//   } catch (err) {
-//     console.error('Error initializing sample data:', err);
-//   }
-// }
-
 // 🚫 Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
@@ -570,7 +460,7 @@ app.use('*', (req, res) => {
   });
 });
 
-// 🛑 Graceful shutdown
+// Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down server gracefully...');
   process.exit(0);
