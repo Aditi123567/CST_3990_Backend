@@ -312,6 +312,31 @@ app.post('/auth/login', validateLogin, async (req, res) => {
     res.status(500).json({ message: 'Login failed', error: err.message });
   }
 });
+app.get('/collection/:collectionName/search', async (req, res, next) => {
+        const query = req.query.q;
+        const collection = req.collection;
+
+        if (!query) {
+            return res.status(400).json({ error: 'Query parameter "q" is required.' });
+                }
+
+    try {
+        console.log("Search query received:", query);
+        console.log("Collection name:", req.params.collectionName);
+
+        const results = await collection.find({
+            $or: [
+                { title: { $regex: query, $options: 'i' } },
+                { description: { $regex: query, $options: 'i' } }
+            ]
+        }).toArray();
+
+        res.json(results);
+                } catch (err) {
+            console.error("Search error:", err);
+            res.status(500).json({ error: 'Internal Server Error', details: err.message });
+            }
+        });
 
 // Get single product
 app.get('/collection/Products/:id', async (req, res) => {
