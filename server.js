@@ -13,9 +13,6 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://Orange123:Orange123@cl
 // ✅ CORS Configuration - THE MAIN FIX
 app.use(cors({
   origin: [
-    'http://localhost:5500', 
-    'http://127.0.0.1:5500', 
-    'http://localhost:3000',
     'https://aditi123567.github.io/CST_3990_Frontend/',
     // Add more origins if needed
   ],
