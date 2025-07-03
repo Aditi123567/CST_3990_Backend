@@ -10,6 +10,14 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'rapidread_secret_key';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://Orange123:Orange123@cluster0.hhguvm7.mongodb.net/Bookstore?retryWrites=true&w=majority';
 
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS,POST,PUT");
+    res.setHeader("Access-Control-Allow-Headers", "Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
+    next();
+        });
+
 // ✅ CORS Configuration - THE MAIN FIX
 app.use(cors({
   origin: [
