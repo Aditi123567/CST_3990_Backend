@@ -164,31 +164,69 @@ app.get('/collection/Products', async (req, res) => {
 });
 
 // Search products
-app.get('/collection/:collectionName/search', async (req, res, next) => {
-        const query = req.query.q;
-        const collection = req.collection;
+app.get('/collection/:collectionName/search', async (req, res) => {
+  console.log('🔍 Search request received');
+  console.log('🔍 Collection:', req.params.collectionName);
+  console.log('🔍 Query:', req.query.q);
+  console.log('🔍 Request origin:', req.headers.origin);
 
-        if (!query) {
-            return res.status(400).json({ error: 'Query parameter "q" is required.' });
-                }
+  const query = req.query.q;
+  const collectionName = req.params.collectionName;
 
-    try {
-        console.log("Search query received:", query);
-        console.log("Collection name:", req.params.collectionName);
+  // Validate query parameter
+  if (!query || query.trim().length === 0) {
+    return res.status(400).json({ 
+      error: 'Query parameter "q" is required and cannot be empty.' 
+    });
+  }
 
-        const results = await collection.find({
-            $or: [
-                { title: { $regex: query, $options: 'i' } },
-                { description: { $regex: query, $options: 'i' } }
-            ]
-        }).toArray();
+  // Validate collection name
+  if (collectionName !== 'Products') {
+    return res.status(400).json({ 
+      error: 'Invalid collection name. Only "Products" is supported.' 
+    });
+  }
 
-        res.json(results);
-                } catch (err) {
-            console.error("Search error:", err);
-            res.status(500).json({ error: 'Internal Server Error', details: err.message });
-            }
-        });
+  try {
+    // Check database connection
+    if (!db) {
+      console.error('❌ Database not connected');
+      return res.status(500).json({ 
+        error: 'Database not connected' 
+      });
+    }
+
+    // Enhanced search with multiple fields
+    const searchRegex = new RegExp(query.trim(), 'i'); // Case-insensitive
+    
+    const results = await db.collection('Products').find({
+      $or: [
+        { title: { $regex: searchRegex } },
+        { author: { $regex: searchRegex } },
+        { genre: { $regex: searchRegex } },
+        { description: { $regex: searchRegex } }
+        // Add more fields as needed
+      ]
+    }).toArray();
+
+    console.log(`✅ Search completed: Found ${results.length} results for "${query}"`);
+    
+    // Add CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    res.json(results);
+    
+  } catch (err) {
+    console.error('❌ Search error:', err);
+    res.status(500).json({ 
+      error: 'Internal Server Error', 
+      message: 'Search failed',
+      details: process.env.NODE_ENV === 'development' ? err.message : 'Please try again'
+    });
+  }
+});
 // 👤 AUTHENTICATION ROUTES
 
 // Register route
